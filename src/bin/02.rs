@@ -7,7 +7,7 @@ type ParseError = String;
 enum Shape {
     Rock,
     Paper,
-    Scrissor,
+    Scissors,
 }
 
 impl Shape {
@@ -15,7 +15,7 @@ impl Shape {
         match self {
             Self::Rock => 1,
             Self::Paper => 2,
-            Self::Scrissor => 3,
+            Self::Scissors => 3,
         }
     }
 }
@@ -27,7 +27,7 @@ impl FromStr for Shape {
         match s {
             "A" | "X" => Ok(Self::Rock),
             "B" | "Y" => Ok(Self::Paper),
-            "C" | "Z" => Ok(Self::Scrissor),
+            "C" | "Z" => Ok(Self::Scissors),
             _ => Err(format!("Shape parse error: \"{s}\" not a valid shape")),
         }
     }
@@ -70,9 +70,9 @@ impl Round {
     fn outcome(&self) -> Outcome {
         match self {
             Round(a, b) if a == b => Outcome::Draw,
-            Round(Shape::Rock, Shape::Scrissor)
+            Round(Shape::Rock, Shape::Scissors)
             | Round(Shape::Paper, Shape::Rock)
-            | Round(Shape::Scrissor, Shape::Paper) => Outcome::Loss,
+            | Round(Shape::Scissors, Shape::Paper) => Outcome::Loss,
             _ => Outcome::Win,
         }
     }
@@ -129,12 +129,12 @@ impl Plan {
     fn round(&self) -> Round {
         let shape = match self {
             Plan(s, Outcome::Draw) => s.clone(),
-            Plan(Shape::Paper, Outcome::Win) => Shape::Scrissor,
-            Plan(Shape::Scrissor, Outcome::Win) => Shape::Rock,
+            Plan(Shape::Paper, Outcome::Win) => Shape::Scissors,
+            Plan(Shape::Scissors, Outcome::Win) => Shape::Rock,
             Plan(Shape::Rock, Outcome::Win) => Shape::Paper,
             Plan(Shape::Paper, Outcome::Loss) => Shape::Rock,
-            Plan(Shape::Scrissor, Outcome::Loss) => Shape::Paper,
-            Plan(Shape::Rock, Outcome::Loss) => Shape::Scrissor,
+            Plan(Shape::Scissors, Outcome::Loss) => Shape::Paper,
+            Plan(Shape::Rock, Outcome::Loss) => Shape::Scissors,
         };
         Round(self.0.clone(), shape)
     }
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_round_outcome() {
-        assert_eq!(Round(Shape::Rock, Shape::Scrissor).outcome(), Outcome::Loss);
+        assert_eq!(Round(Shape::Rock, Shape::Scissors).outcome(), Outcome::Loss);
         assert_eq!(Round(Shape::Rock, Shape::Rock).outcome(), Outcome::Draw);
         assert_eq!(Round(Shape::Rock, Shape::Paper).outcome(), Outcome::Win);
     }
@@ -214,7 +214,7 @@ mod tests {
     fn test_round_score() {
         assert_eq!(Round(Shape::Rock, Shape::Paper).score(), 8);
         assert_eq!(Round(Shape::Paper, Shape::Rock).score(), 1);
-        assert_eq!(Round(Shape::Scrissor, Shape::Scrissor).score(), 6);
+        assert_eq!(Round(Shape::Scissors, Shape::Scissors).score(), 6);
     }
 
     #[test]
@@ -223,7 +223,7 @@ mod tests {
             rounds: vec![
                 Round(Shape::Rock, Shape::Paper),
                 Round(Shape::Paper, Shape::Rock),
-                Round(Shape::Scrissor, Shape::Scrissor),
+                Round(Shape::Scissors, Shape::Scissors),
             ],
         };
         assert_eq!(guide.score(), 15);
