@@ -184,12 +184,12 @@ impl FromStr for PlanStrategyGuide {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let strategy_guide = input.parse::<RoundStrategyGuide>().unwrap();
+    let strategy_guide = input.parse::<RoundStrategyGuide>().ok()?;
     Some(strategy_guide.score())
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    let strategy_guide = input.parse::<PlanStrategyGuide>().unwrap();
+    let strategy_guide = input.parse::<PlanStrategyGuide>().ok()?;
     Some(strategy_guide.score())
 }
 
