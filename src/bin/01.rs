@@ -1,8 +1,7 @@
+use itertools::Itertools;
 use std::cmp::Reverse;
 use std::num::ParseIntError;
 use std::str::FromStr;
-
-use itertools::Itertools;
 
 #[derive(Debug)]
 struct Elf {
