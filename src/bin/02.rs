@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 type ParseError = String;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum Shape {
     Rock,
     Paper,
@@ -33,7 +33,7 @@ impl FromStr for Shape {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum Outcome {
     Loss,
     Draw,
@@ -46,6 +46,19 @@ impl Outcome {
             Self::Loss => 0,
             Self::Draw => 3,
             Self::Win => 6,
+        }
+    }
+}
+
+impl FromStr for Outcome {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "X" => Ok(Self::Loss),
+            "Y" => Ok(Self::Draw),
+            "Z" => Ok(Self::Win),
+            _ => Err(format!("Outcome parse error: \"{s}\" not a valid outcome")),
         }
     }
 }
@@ -85,17 +98,17 @@ impl FromStr for Round {
 }
 
 #[derive(Debug)]
-struct StrategyGuide {
+struct RoundStrategyGuide {
     rounds: Vec<Round>,
 }
 
-impl StrategyGuide {
+impl RoundStrategyGuide {
     fn score(&self) -> u32 {
         self.rounds.iter().map(Round::score).sum()
     }
 }
 
-impl FromStr for StrategyGuide {
+impl FromStr for RoundStrategyGuide {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -109,13 +122,75 @@ impl FromStr for StrategyGuide {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct Plan(Shape, Outcome);
+
+impl Plan {
+    fn round(&self) -> Round {
+        let shape = match self {
+            Plan(s, Outcome::Draw) => s.clone(),
+            Plan(Shape::Paper, Outcome::Win) => Shape::Scrissor,
+            Plan(Shape::Scrissor, Outcome::Win) => Shape::Rock,
+            Plan(Shape::Rock, Outcome::Win) => Shape::Paper,
+            Plan(Shape::Paper, Outcome::Loss) => Shape::Rock,
+            Plan(Shape::Scrissor, Outcome::Loss) => Shape::Paper,
+            Plan(Shape::Rock, Outcome::Loss) => Shape::Scrissor,
+        };
+        Round(self.0.clone(), shape)
+    }
+
+    fn score(&self) -> u32 {
+        self.round().score()
+    }
+}
+
+impl FromStr for Plan {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (shape_str, outcome_str) = s
+            .split_whitespace()
+            .collect_tuple()
+            .ok_or("Round Parse Error: expected 2 Shapes per round")?;
+        let shape = shape_str.parse::<Shape>()?;
+        let outcome = outcome_str.parse::<Outcome>()?;
+        Ok(Plan(shape, outcome))
+    }
+}
+
+#[derive(Debug)]
+struct PlanStrategyGuide {
+    rounds: Vec<Plan>,
+}
+
+impl PlanStrategyGuide {
+    fn score(&self) -> u32 {
+        self.rounds.iter().map(Plan::score).sum()
+    }
+}
+
+impl FromStr for PlanStrategyGuide {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parsed_rounds = s
+            .lines()
+            .map(|l| l.parse::<Plan>())
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            rounds: parsed_rounds,
+        })
+    }
+}
+
 pub fn part_one(input: &str) -> Option<u32> {
-    let strategy_guide = input.parse::<StrategyGuide>().unwrap();
+    let strategy_guide = input.parse::<RoundStrategyGuide>().unwrap();
     Some(strategy_guide.score())
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let strategy_guide = input.parse::<PlanStrategyGuide>().unwrap();
+    Some(strategy_guide.score())
 }
 
 fn main() {
@@ -143,8 +218,8 @@ mod tests {
     }
 
     #[test]
-    fn test_strategy_guide_score() {
-        let guide = StrategyGuide {
+    fn test_round_strategy_guide_score() {
+        let guide = RoundStrategyGuide {
             rounds: vec![
                 Round(Shape::Rock, Shape::Paper),
                 Round(Shape::Paper, Shape::Rock),
@@ -163,6 +238,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 2);
-        assert_eq!(part_two(&input), None);
+        assert_eq!(part_two(&input), Some(12));
     }
 }
