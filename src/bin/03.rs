@@ -54,12 +54,12 @@ impl Rucksack {
     }
 }
 
-fn score_pockets(num_pockets: usize, input: &Input) -> Option<u32> {
+fn score_pockets(input: &Input) -> Option<u32> {
     Some(
         input
             .iter()
             .filter_map(|l| {
-                let (one_str, two_str) = l.split_at(l.len() / num_pockets);
+                let (one_str, two_str) = l.split_at(l.len() / 2);
                 let one = one_str.parse::<Rucksack>().ok()?;
                 let two = two_str.parse::<Rucksack>().ok()?;
                 Some(one.common_sack(&two).score())
@@ -87,7 +87,7 @@ fn score_groups(group_size: usize, input: &Input) -> Option<u32> {
 
 pub fn part_one(input: &str) -> Option<u32> {
     let lines: Input = input.lines().collect();
-    score_pockets(2, &lines)
+    score_pockets(&lines)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
