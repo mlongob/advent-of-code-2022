@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use std::{collections::HashSet, ops::BitAnd};
 
+type Input<'a> = Vec<&'a str>;
+
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 struct Item(char);
 
@@ -52,12 +54,12 @@ impl Rucksack {
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+fn score_pockets(num_pockets: usize, input: &Input) -> Option<u32> {
     Some(
         input
-            .lines()
+            .iter()
             .filter_map(|l| {
-                let (one_str, two_str) = l.split_at(l.len() / 2);
+                let (one_str, two_str) = l.split_at(l.len() / num_pockets);
                 let one = one_str.parse::<Rucksack>().ok()?;
                 let two = two_str.parse::<Rucksack>().ok()?;
                 Some(one.common_sack(&two).score())
@@ -66,11 +68,10 @@ pub fn part_one(input: &str) -> Option<u32> {
     )
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    let lines: Vec<_> = input.lines().collect();
+fn score_groups(group_size: usize, input: &Input) -> Option<u32> {
     Some(
-        lines
-            .chunks(3)
+        input
+            .chunks(group_size)
             .filter_map(|chunks| {
                 Some(
                     chunks
@@ -82,6 +83,16 @@ pub fn part_two(input: &str) -> Option<u32> {
             })
             .sum(),
     )
+}
+
+pub fn part_one(input: &str) -> Option<u32> {
+    let lines: Input = input.lines().collect();
+    score_pockets(2, &lines)
+}
+
+pub fn part_two(input: &str) -> Option<u32> {
+    let lines: Input = input.lines().collect();
+    score_groups(3, &lines)
 }
 
 fn main() {
