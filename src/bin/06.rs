@@ -1,14 +1,12 @@
 use itertools::Itertools;
 
 fn find_signal(marker_count: usize, input: &str) -> Option<u32> {
-    let mut count = marker_count as u32;
-    for s in input.as_bytes().windows(marker_count) {
-        if s.iter().all_unique() {
-            return Some(count);
-        }
-        count += 1;
-    }
-    None
+    let (enum_count, _) = input
+        .as_bytes()
+        .windows(marker_count)
+        .enumerate()
+        .find(|(_, s)| s.iter().all_unique())?;
+    Some((enum_count + marker_count) as u32)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
