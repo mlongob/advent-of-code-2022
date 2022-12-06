@@ -1,5 +1,6 @@
 use advent_of_code::helpers::Stack;
-use std::{borrow::BorrowMut, collections::VecDeque};
+use std::borrow::BorrowMut;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Item(char);
@@ -78,44 +79,9 @@ impl CraneSystem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Plan {
+pub struct Plan {
     initial_system: CraneSystem,
     rearrangement_procedure: Vec<Command>,
-}
-
-mod PlanParser {
-    use nom::{bytes, character, combinator, sequence, IResult, Parser};
-
-    fn empty_item(input: &str) -> IResult<&str, Option<super::Item>> {
-        let parser = nom::multi::count(character::complete::char(' '), 3);
-        combinator::map(parser, |_| None)(input)
-    }
-
-    fn item(input: &str) -> IResult<&str, Option<super::Item>> {
-        let parser = sequence::delimited(
-            character::complete::char('['),
-            character::complete::anychar,
-            character::complete::char(']'),
-        );
-        combinator::map(parser, |c| Some(super::Item(c)))(input)
-    }
-
-    fn optional_item(input: &str) -> IResult<&str, Option<super::Item>> {
-        nom::branch::alt((item, empty_item))(input)
-    }
-
-    pub fn item_line(input: &str) -> IResult<&str, Vec<Option<super::Item>>> {
-        nom::multi::separated_list1(character::complete::char(' '), optional_item)(input)
-    }
-
-    fn plan(input: &str) -> super::Plan {
-        let initial_system = unimplemented!();
-        let rearrangement_procedure = unimplemented!();
-        super::Plan {
-            initial_system,
-            rearrangement_procedure,
-        }
-    }
 }
 
 impl Plan {
@@ -128,117 +94,22 @@ impl Plan {
     }
 }
 
+impl FromStr for Plan {
+    type Err = plan_parser::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        plan_parser::parse(s)
+    }
+}
+
 pub fn part_one(input: &str) -> Option<String> {
-    let (stacks, moves) = input.split_once("\n\n")?;
-    let stacks: Vec<_> = stacks
-        .lines()
-        .map(|s| s.replace("[", " ").replace("]", " "))
-        .rev()
-        .collect();
-    let stack_nums = stacks[0].split_whitespace().count();
-    let stacks = &stacks[1..];
-
-    let mut data: Vec<VecDeque<char>> = Vec::new();
-
-    for _i in 0..stack_nums {
-        data.push(VecDeque::new());
-    }
-
-    for stack in stacks {
-        let stack: Vec<_> = stack.chars().collect();
-
-        for i in 0..stack_nums {
-            let c: char = stack[4 * i + 1];
-            if c.is_alphanumeric() {
-                data[i].push_front(c);
-            }
-        }
-    }
-
-    let moves: Vec<_> = moves
-        .lines()
-        .map(|l| {
-            l.replace("move ", "")
-                .replace("from ", "")
-                .replace("to ", "")
-        })
-        .collect();
-
-    for m in moves {
-        let (num_s, rest) = m.split_once(" ")?;
-        let (from_s, to_s) = rest.split_once(" ")?;
-        let num = num_s.parse::<usize>().ok()?;
-        let from = from_s.parse::<usize>().ok()?;
-        let to = to_s.parse::<usize>().ok()?;
-        for _ in 0..num {
-            let from_queue = &mut data[from - 1];
-            let item = from_queue.pop_front()?;
-            let to_queue = &mut data[to - 1];
-            to_queue.push_front(item);
-        }
-    }
-
-    let result: String = data.iter().filter_map(|q| q.front()).collect();
-    Some(result)
+    let plan = input.parse::<Plan>().ok()?;
+    Some(plan.apply(&CraneType::CrateMover9000))
 }
 
 pub fn part_two(input: &str) -> Option<String> {
-    let (stacks, moves) = input.split_once("\n\n")?;
-    let stacks: Vec<_> = stacks
-        .lines()
-        .map(|s| s.replace("[", " ").replace("]", " "))
-        .rev()
-        .collect();
-    let stack_nums = stacks[0].split_whitespace().count();
-    let stacks = &stacks[1..];
-
-    let mut data: Vec<VecDeque<char>> = Vec::new();
-
-    for _i in 0..stack_nums {
-        data.push(VecDeque::new());
-    }
-
-    for stack in stacks {
-        let stack: Vec<_> = stack.chars().collect();
-
-        for i in 0..stack_nums {
-            let c: char = stack[4 * i + 1];
-            if c.is_alphanumeric() {
-                data[i].push_front(c);
-            }
-        }
-    }
-
-    let moves: Vec<_> = moves
-        .lines()
-        .map(|l| {
-            l.replace("move ", "")
-                .replace("from ", "")
-                .replace("to ", "")
-        })
-        .collect();
-
-    for m in moves {
-        let (num_s, rest) = m.split_once(" ")?;
-        let (from_s, to_s) = rest.split_once(" ")?;
-        let num = num_s.parse::<usize>().ok()?;
-        let from = from_s.parse::<usize>().ok()?;
-        let to = to_s.parse::<usize>().ok()?;
-        let from_queue = &mut data[from - 1];
-        let mut temp: Vec<char> = Vec::new();
-        for _ in 0..num {
-            let item = from_queue.pop_front()?;
-            temp.push(item);
-        }
-        let to_queue = &mut data[to - 1];
-        for item in temp.into_iter().rev() {
-            to_queue.push_front(item);
-        }
-    }
-
-    let result: String = data.iter().filter_map(|q| q.front()).collect();
-
-    Some(result)
+    let plan = input.parse::<Plan>().ok()?;
+    Some(plan.apply(&CraneType::CrateMover9001))
 }
 
 fn main() {
@@ -250,11 +121,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_item_line() {
-        assert_eq!(PlanParser::item_line("[N] [C]    "), Ok(("", vec![Some(Item('N'))])));
-    }
 
     #[test]
     fn crane_system_build() {
@@ -333,5 +199,163 @@ mod tests {
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 5);
         assert_eq!(part_two(&input), Some("MCD".to_string()));
+    }
+}
+
+mod plan_parser {
+    use super::*;
+    use nom::{bytes, character, combinator, sequence, Finish, IResult};
+
+    fn empty_item(input: &str) -> IResult<&str, Option<Item>> {
+        let parser = nom::multi::count(character::complete::char(' '), 3);
+        combinator::map(parser, |_| None)(input)
+    }
+
+    fn item(input: &str) -> IResult<&str, Option<Item>> {
+        let parser = sequence::delimited(
+            character::complete::char('['),
+            character::complete::anychar,
+            character::complete::char(']'),
+        );
+        combinator::map(parser, |c| Some(Item(c)))(input)
+    }
+
+    fn optional_item(input: &str) -> IResult<&str, Option<Item>> {
+        nom::branch::alt((item, empty_item))(input)
+    }
+
+    fn item_line(input: &str) -> IResult<&str, Vec<Option<Item>>> {
+        nom::multi::separated_list1(character::complete::char(' '), optional_item)(input)
+    }
+
+    fn crane_system(input: &str) -> IResult<&str, CraneSystem> {
+        let parser = nom::multi::separated_list1(character::complete::newline, item_line);
+        combinator::map(parser, |lines| {
+            let mut stacks: Vec<Stack<Item>> = Vec::new();
+            for line in lines.iter().rev() {
+                stacks.resize(line.len(), Stack::new());
+                for i in 0..line.len() {
+                    if let Some(item) = &line[i] {
+                        stacks[i].push(item.clone())
+                    }
+                }
+            }
+            CraneSystem { stacks }
+        })(input)
+    }
+
+    fn separator(input: &str) -> IResult<&str, ()> {
+        let parser = sequence::delimited(
+            character::complete::space1,
+            nom::multi::separated_list1(character::complete::space1, character::complete::digit1),
+            character::complete::space1,
+        );
+        combinator::map(parser, |_| ())(input)
+    }
+
+    fn number(input: &str) -> IResult<&str, usize> {
+        combinator::map_res(character::complete::digit1, str::parse::<usize>)(input)
+    }
+
+    fn command(input: &str) -> IResult<&str, Command> {
+        let parser = sequence::tuple((
+            bytes::complete::tag("move"),
+            character::complete::space1,
+            number,
+            character::complete::space1,
+            bytes::complete::tag("from"),
+            character::complete::space1,
+            number,
+            character::complete::space1,
+            bytes::complete::tag("to"),
+            character::complete::space1,
+            number,
+        ));
+        combinator::map(parser, |(_, _, cnt, _, _, _, frm, _, _, _, t)| Command {
+            quantity: cnt,
+            from_id: frm - 1,
+            to_id: t - 1,
+        })(input)
+    }
+
+    fn plan(input: &str) -> IResult<&str, Plan> {
+        let parser = sequence::tuple((
+            crane_system,
+            character::complete::newline,
+            separator,
+            character::complete::newline,
+            character::complete::newline,
+            nom::multi::separated_list1(character::complete::newline, command),
+        ));
+        combinator::map(
+            parser,
+            |(initial_system, _, _, _, _, rearrangement_procedure)| Plan {
+                initial_system,
+                rearrangement_procedure,
+            },
+        )(input)
+    }
+
+    pub type Error = nom::error::Error<String>;
+
+    pub fn parse(input: &str) -> Result<Plan, Error> {
+        match plan(input).finish() {
+            Ok((_remaining, plan)) => Ok(plan),
+            Err(nom::error::Error { input, code }) => Err(Error {
+                input: input.to_string(),
+                code,
+            }),
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn parse_item_line() {
+            assert_eq!(
+                item_line("[N] [C]    "),
+                Ok(("", vec![Some(Item('N')), Some(Item('C')), None]))
+            );
+            assert_eq!(
+                item_line("[Z] [M] [P]"),
+                Ok(("", vec![Some(Item('Z')), Some(Item('M')), Some(Item('P'))]))
+            );
+        }
+
+        #[test]
+        fn parse_crane_system() {
+            assert_eq!(
+                crane_system(
+                    "    [D]    
+[N] [C]    
+[Z] [M] [P]"
+                ),
+                Ok(("", CraneSystem::build(&["NZ", "DCM", "P"])))
+            );
+        }
+    }
+
+    #[test]
+    fn parse_separator() {
+        assert_eq!(
+            separator(" 1   2   3   4   5   6   7   8   9 "),
+            Ok(("", ()))
+        );
+    }
+
+    #[test]
+    fn parse_command() {
+        assert_eq!(
+            command("move 3 from 1 to 3"),
+            Ok((
+                "",
+                Command {
+                    quantity: 3,
+                    from_id: 0,
+                    to_id: 2
+                }
+            ))
+        );
     }
 }
