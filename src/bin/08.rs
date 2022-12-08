@@ -11,32 +11,23 @@ pub struct Position {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TreeGrid {
-    xy_grid: Vec<Vec<TreeHeight>>,
     yx_grid: Vec<Vec<TreeHeight>>,
 }
 
 impl TreeGrid {
     pub fn new() -> TreeGrid {
         TreeGrid {
-            xy_grid: Vec::new(),
             yx_grid: Vec::new(),
         }
     }
 
     pub fn add_tree(&mut self, position: &Position, height: TreeHeight) {
-        if (position.x) >= self.xy_grid.len() {
-            self.xy_grid.resize(position.x + 1, Vec::new());
-        }
         if (position.y) >= self.yx_grid.len() {
             self.yx_grid.resize(position.y + 1, Vec::new());
         }
         if (position.x) >= self.yx_grid[position.y].len() {
             self.yx_grid[position.y].resize(position.x + 1, 0);
         }
-        if (position.y) >= self.xy_grid[position.x].len() {
-            self.xy_grid[position.x].resize(position.y + 1, 0);
-        }
-        self.xy_grid[position.x][position.y] = height;
         self.yx_grid[position.y][position.x] = height;
     }
 
@@ -53,11 +44,13 @@ impl TreeGrid {
     }
 
     fn bottom_view(&self, position: &Position) -> impl Iterator<Item = &TreeHeight> {
-        self.xy_grid[position.x][position.y + 1..].iter()
+        let position = position.clone();
+        self.yx_grid[position.y+1..].iter().map(move|v|&v[position.x])
     }
 
     fn top_view(&self, position: &Position) -> impl Iterator<Item = &TreeHeight> {
-        self.xy_grid[position.x][0..position.y].iter().rev()
+        let position = position.clone();
+        self.yx_grid[0..position.y].iter().map(move|v|&v[position.x]).rev()
     }
 
     fn right_view(&self, position: &Position) -> impl Iterator<Item = &TreeHeight> {
