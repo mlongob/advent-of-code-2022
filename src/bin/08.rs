@@ -154,7 +154,7 @@ mod tests {
         let input = advent_of_code::read_file("examples", 8);
         let tree_grid: TreeGrid = input.parse().unwrap();
         let position = &Position { x: 2, y: 1 };
-        assert_eq!(tree_grid.scenic_score(&position), 4);
+        assert_eq!(tree_grid.scenic_score(position), 4);
     }
 
     #[test]

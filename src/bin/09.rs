@@ -36,11 +36,7 @@ impl Position {
 
     pub fn follow(&mut self, head: &Position) {
         if !self.touches(head) {
-            let offset = if head.x == self.x || head.y == self.y {
-                1
-            } else {
-                0
-            };
+            let offset = (head.x == self.x || head.y == self.y) as i32;
             if head.y > self.y + offset {
                 self.step(&Direction::Up);
             }
@@ -122,27 +118,28 @@ impl Rope {
     }
 
     pub fn tail(&self) -> &Position {
-        &self.knots.last().unwrap()
+        self.knots.last().unwrap()
     }
 }
 
-type Input = Vec<Move>;
-
 pub fn solve(input: &str, rope_len: usize) -> Option<u32> {
-    let input: Input = input
+    let tail_unique_positions = input
         .lines()
         .filter_map(|l| l.parse::<Move>().ok())
-        .collect();
-    let mut rope = Rope::with_knots(rope_len);
-    let mut visited_positions: HashSet<Position> = HashSet::new();
-
-    for Move { direction, steps } in input {
-        for _ in 0..steps {
-            rope.do_move(&direction);
-            visited_positions.insert(rope.tail().clone());
-        }
-    }
-    Some(visited_positions.len() as u32)
+        .fold(
+            (Rope::with_knots(rope_len), HashSet::new()),
+            |(mut rope, mut visited_positions): (Rope, HashSet<Position>),
+             Move { direction, steps }| {
+                for _ in 0..steps {
+                    rope.do_move(&direction);
+                    visited_positions.insert(rope.tail().clone());
+                }
+                (rope, visited_positions)
+            },
+        )
+        .1
+        .len() as u32;
+    Some(tail_unique_positions)
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
