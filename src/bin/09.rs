@@ -9,7 +9,11 @@ pub struct Position {
 }
 
 impl Position {
-    fn step(&mut self, direction: &Direction) {
+    pub fn new() -> Position {
+        Position { x: 0, y: 0 }
+    }
+
+    pub fn step(&mut self, direction: &Direction) {
         match direction {
             Direction::Up => {
                 self.y += 1;
@@ -25,10 +29,36 @@ impl Position {
             }
         }
     }
+
+    pub fn touches(&self, other: &Position) -> bool {
+        (self.x - other.x).abs() <= 1 && (self.y - other.y).abs() <= 1
+    }
+
+    pub fn follow(&mut self, head: &Position) {
+        if !self.touches(head) {
+            let offset = if head.x == self.x || head.y == self.y {
+                1
+            } else {
+                0
+            };
+            if head.y > self.y + offset {
+                self.step(&Direction::Up);
+            }
+            if head.y < self.y - offset {
+                self.step(&Direction::Down);
+            }
+            if head.x > self.x + offset {
+                self.step(&Direction::Right);
+            }
+            if head.x < self.x - offset {
+                self.step(&Direction::Left);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Direction {
+pub enum Direction {
     Up,
     Down,
     Left,
@@ -50,9 +80,9 @@ impl FromStr for Direction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Move {
-    direction: Direction,
-    steps: u32,
+pub struct Move {
+    pub direction: Direction,
+    pub steps: u32,
 }
 
 impl FromStr for Move {
@@ -66,34 +96,61 @@ impl FromStr for Move {
     }
 }
 
-fn rope_physics(head: &Position, tail: Position) -> Position
-{
-    tail
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rope {
+    knots: Vec<Position>,
+}
+
+impl Rope {
+    pub fn with_knots(num_knots: usize) -> Rope {
+        assert!(
+            num_knots >= 2,
+            "Rope::with_knots called with less than 2 knots"
+        );
+        let mut knots = Vec::with_capacity(num_knots);
+        knots.resize(num_knots, Position::new());
+        Rope { knots }
+    }
+
+    pub fn do_move(&mut self, direction: &Direction) {
+        let head = self.knots.first_mut().unwrap();
+        head.step(direction);
+        self.knots.iter_mut().reduce(|prev, knot| {
+            knot.follow(prev);
+            knot
+        });
+    }
+
+    pub fn tail(&self) -> &Position {
+        &self.knots.last().unwrap()
+    }
 }
 
 type Input = Vec<Move>;
 
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn solve(input: &str, rope_len: usize) -> Option<u32> {
     let input: Input = input
         .lines()
         .filter_map(|l| l.parse::<Move>().ok())
         .collect();
-    let mut head_position = Position { x: 0, y: 0 };
-    let mut tail_position = Position { x: 0, y: 0 };
+    let mut rope = Rope::with_knots(rope_len);
     let mut visited_positions: HashSet<Position> = HashSet::new();
 
     for Move { direction, steps } in input {
         for _ in 0..steps {
-            head_position.step(&direction);
-            tail_position = rope_physics(&head_position, tail_position);
-            visited_positions.insert(tail_position.clone());
+            rope.do_move(&direction);
+            visited_positions.insert(rope.tail().clone());
         }
     }
     Some(visited_positions.len() as u32)
 }
 
+pub fn part_one(input: &str) -> Option<u32> {
+    solve(input, 2)
+}
+
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    solve(input, 10)
 }
 
 fn main() {
@@ -115,6 +172,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 9);
-        assert_eq!(part_two(&input), None);
+        assert_eq!(part_two(&input), Some(1));
     }
 }
