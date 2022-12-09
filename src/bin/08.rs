@@ -45,12 +45,17 @@ impl TreeGrid {
 
     fn bottom_view(&self, position: &Position) -> impl Iterator<Item = &TreeHeight> {
         let position = position.clone();
-        self.yx_grid[position.y+1..].iter().map(move|v|&v[position.x])
+        self.yx_grid[position.y + 1..]
+            .iter()
+            .map(move |v| &v[position.x])
     }
 
     fn top_view(&self, position: &Position) -> impl Iterator<Item = &TreeHeight> {
         let position = position.clone();
-        self.yx_grid[0..position.y].iter().map(move|v|&v[position.x]).rev()
+        self.yx_grid[0..position.y]
+            .iter()
+            .map(move |v| &v[position.x])
+            .rev()
     }
 
     fn right_view(&self, position: &Position) -> impl Iterator<Item = &TreeHeight> {
