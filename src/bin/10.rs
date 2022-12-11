@@ -48,20 +48,17 @@ pub struct Program {
 
 impl Program {
     pub fn with_instructions(instructions: &[Instruction]) -> Program {
-        let cycles = instructions.iter().fold(
-            vec![1],
-            |mut cycles, instr| {
-                let register = *cycles.last().unwrap();
-                cycles.push(register);
-                match instr {
-                    Instruction::NoOp => {}
-                    Instruction::AddX(addx) => {
-                        cycles.push(register + addx);
-                    }
+        let cycles = instructions.iter().fold(vec![1], |mut cycles, instr| {
+            let register = *cycles.last().unwrap();
+            cycles.push(register);
+            match instr {
+                Instruction::NoOp => {}
+                Instruction::AddX(addx) => {
+                    cycles.push(register + addx);
                 }
-                cycles
-            },
-        );
+            }
+            cycles
+        });
         Program { cycles }
     }
 
