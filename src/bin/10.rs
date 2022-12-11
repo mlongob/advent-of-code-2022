@@ -76,7 +76,7 @@ impl Program {
             .map(|row| {
                 (0..COLUMNS)
                     .map(|column| {
-                        let signal: i32 = self.cycles[row * 40 + column];
+                        let signal: i32 = self.cycles[row * COLUMNS + column];
                         if ((column as i32) - signal).abs() <= 1 {
                             '#'
                         } else {
