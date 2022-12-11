@@ -3,11 +3,11 @@ use itertools::Itertools;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum OperationToken {
     Old,
-    UnsignedInt(u32),
+    UnsignedInt(u64),
 }
 
 impl OperationToken {
-    pub fn apply(&self, old: u32) -> u32 {
+    pub fn apply(&self, old: u64) -> u64 {
         match self {
             OperationToken::Old => old,
             OperationToken::UnsignedInt(n) => *n,
@@ -31,7 +31,7 @@ pub struct Operation {
 }
 
 impl Operation {
-    pub fn apply(&self, old: u32) -> u32 {
+    pub fn apply(&self, old: u64) -> u64 {
         let lhs = self.lhs.apply(old);
         let rhs = self.rhs.apply(old);
         match self.operator {
@@ -45,13 +45,13 @@ impl Operation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Test {
-    pub divisible_by: u32,
+    pub divisible_by: u64,
     pub true_monkey_id: usize,
     pub false_monkey_id: usize,
 }
 
 impl Test {
-    pub fn apply(&self, n: u32) -> usize {
+    pub fn apply(&self, n: u64) -> usize {
         if n % self.divisible_by == 0 {
             self.true_monkey_id
         } else {
@@ -62,21 +62,20 @@ impl Test {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Monkey {
-    pub items: Vec<u32>,
+    pub items: Vec<u64>,
     pub operation: Operation,
     pub test: Test,
 }
 
 impl Monkey {
-    pub fn receive_item(&mut self, item: u32) {
+    pub fn receive_item(&mut self, item: u64) {
         self.items.push(item)
     }
 
-    pub fn throw_item(&mut self) -> Option<(usize, u32)> {
-        const RELIEF_DIVIDER: u32 = 3;
+    pub fn throw_item(&mut self, reducer: impl Fn(u64) -> u64) -> Option<(usize, u64)> {
         let mut item = self.items.pop()?;
         item = self.operation.apply(item);
-        item /= RELIEF_DIVIDER;
+        item = reducer(item);
         let monkey_id = self.test.apply(item);
         Some((monkey_id, item))
     }
@@ -84,7 +83,7 @@ impl Monkey {
 
 pub struct MonkeyBusiness {
     monkeys: Vec<Monkey>,
-    inspect_counts: Vec<u32>,
+    inspect_counts: Vec<u64>,
 }
 
 impl MonkeyBusiness {
@@ -97,10 +96,10 @@ impl MonkeyBusiness {
         }
     }
 
-    pub fn run_round(&mut self) {
+    pub fn run_round(&mut self, reducer: impl Fn(u64) -> u64) {
         for throwing_monkey_id in 0..self.monkeys.len() {
             while let Some((receiving_monkey_id, item)) =
-                self.monkeys[throwing_monkey_id].throw_item()
+                self.monkeys[throwing_monkey_id].throw_item(&reducer)
             {
                 assert_ne!(throwing_monkey_id, receiving_monkey_id);
                 self.inspect_counts[throwing_monkey_id] += 1;
@@ -109,30 +108,32 @@ impl MonkeyBusiness {
         }
     }
 
-    pub fn run_rounds(&mut self, rounds: u32) {
-        for _ in 0..rounds {
-            self.run_round();
-        }
-    }
-
-    pub fn monkey_business_score(&self, num_monkeys: usize) -> u32 {
+    pub fn monkey_business_score(&self) -> u64 {
+        const NUM_MONKEYS: usize = 2;
         self.inspect_counts
             .iter()
             .sorted()
             .rev()
-            .take(num_monkeys)
+            .take(NUM_MONKEYS)
             .fold(1, |acc, c| c * acc)
     }
 }
 
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     let mut mb = MonkeyBusiness::with_monkeys(input.parse::<input_parser::Input>().ok()?.monkeys);
-    mb.run_rounds(20);
-    Some(mb.monkey_business_score(2))
+    for _ in 0..20 {
+        mb.run_round(|n| n / 3);
+    }
+    Some(mb.monkey_business_score())
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<u64> {
+    let mut mb = MonkeyBusiness::with_monkeys(input.parse::<input_parser::Input>().ok()?.monkeys);
+    let base: u64 = mb.monkeys.iter().map(|m| m.test.divisible_by).product();
+    for _ in 0..10000 {
+        mb.run_round(|n| n % base);
+    }
+    Some(mb.monkey_business_score())
 }
 
 fn main() {
@@ -154,7 +155,7 @@ mod tests {
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 11);
-        assert_eq!(part_two(&input), None);
+        assert_eq!(part_two(&input), Some(2713310158));
     }
 }
 
@@ -180,18 +181,18 @@ mod input_parser {
         map_res(digit1, str::parse::<usize>)(input)
     }
 
-    fn number_u32(input: &str) -> IResult<&str, u32> {
-        map_res(digit1, str::parse::<u32>)(input)
+    fn number_u64(input: &str) -> IResult<&str, u64> {
+        map_res(digit1, str::parse::<u64>)(input)
     }
 
-    fn items(input: &str) -> IResult<&str, Vec<u32>> {
-        separated_list1(tuple((tag(","), space0)), number_u32)(input)
+    fn items(input: &str) -> IResult<&str, Vec<u64>> {
+        separated_list1(tuple((tag(","), space0)), number_u64)(input)
     }
 
     fn operation_token(input: &str) -> IResult<&str, OperationToken> {
         alt((
             map(tag("old"), |_| OperationToken::Old),
-            map(number_u32, OperationToken::UnsignedInt),
+            map(number_u64, OperationToken::UnsignedInt),
         ))(input)
     }
 
@@ -226,7 +227,7 @@ mod input_parser {
             tuple((
                 tag("divisible by"),
                 space1,
-                number_u32,
+                number_u64,
                 newline,
                 space0,
                 tag("If true:"),
