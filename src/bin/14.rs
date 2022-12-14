@@ -135,7 +135,7 @@ impl Grid {
         Some(())
     }
 
-    pub fn add_floor(&mut self, floor_delta: usize) {
+    pub fn set_floor(&mut self, floor_delta: usize) {
         self.floor = Some(self.limits.1.y + (floor_delta as i32));
     }
 
@@ -152,7 +152,7 @@ pub fn part_one(input: &str) -> Option<usize> {
 
 pub fn part_two(input: &str) -> Option<usize> {
     let mut grid: Grid = input.parse().ok()?;
-    grid.add_floor(2);
+    grid.set_floor(2);
     let grains_of_sand = from_fn(|| grid.add_sand()).count();
     Some(grains_of_sand + 1)
 }
