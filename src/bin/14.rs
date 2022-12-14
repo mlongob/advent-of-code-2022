@@ -35,11 +35,7 @@ pub struct Grid {
 impl FromStr for Grid {
     type Err = Box<dyn Error>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut grid = Grid {
-            objects: HashMap::new(),
-            limits: (Position::new(), Position::new()),
-            floor: None,
-        };
+        let mut grid = Grid::new();
         s.lines().for_each(|l| {
             l.split(" -> ")
                 .filter_map(|p| p.split_once(','))
@@ -88,6 +84,14 @@ impl fmt::Display for Grid {
 }
 
 impl Grid {
+    pub fn new() -> Grid {
+        Grid {
+            objects: HashMap::new(),
+            limits: (Position::new(), Position::new()),
+            floor: None,
+        }
+    }
+
     fn sand_fall(&self, position: &Position) -> Option<Position> {
         let res = [
             Position {
