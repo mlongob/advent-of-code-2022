@@ -63,7 +63,7 @@ impl DistressSignal {
         let signals = self
             .signal
             .iter()
-            .flat_map(|(a, b)| vec![a, b])
+            .flat_map(|(a, b)| [a, b])
             .sorted()
             .collect::<Vec<_>>();
         let s1 = match signals.binary_search(&&signal_one) {
