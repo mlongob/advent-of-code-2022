@@ -25,7 +25,7 @@ pub enum Object {
     Sand,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Grid {
     objects: HashMap<Position, Object>,
     limits: (Position, Position),

@@ -40,7 +40,7 @@ impl FromStr for SensorReading {
         lazy_static! {
             static ref RE: Regex = Regex::new(r"Sensor at x=(?P<sx>-?\d+), y=(?P<sy>-?\d+): closest beacon is at x=(?P<bx>-?\d+), y=(?P<by>-?\d+)").unwrap();
         }
-        let captures = RE.captures(s).ok_or(anyhow!("Could not match regex"))?;
+        let captures = RE.captures(s).ok_or_else(||anyhow!("Could not match regex"))?;
         Ok(SensorReading {
             sensor: Position {
                 x: captures
@@ -101,7 +101,7 @@ pub fn covered_per_row(input: &str, row_y: i64) -> Option<usize> {
     Some(covered.len() - beacons.len())
 }
 
-fn abs<'a>(val: z3::ast::Int<'a>) -> z3::ast::Int<'a> {
+fn abs(val: z3::ast::Int) -> z3::ast::Int {
     let zero = z3::ast::Int::from_i64(val.get_ctx(), 0);
     val.gt(&zero).ite(&val, &(-&val))
 }
