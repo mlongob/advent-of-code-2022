@@ -1,9 +1,11 @@
 use anyhow::anyhow;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use petgraph::algo::floyd_warshall;
 use petgraph::prelude::*;
 use petgraph::Graph;
 use regex::Regex;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
@@ -27,7 +29,7 @@ impl FromStr for ValveSystem {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         const START_VALVE: &str = "AA";
         lazy_static! {
-            static ref RE: Regex = Regex::new(r"^Valve (?P<name>[A-Z]{2}) has flow rate=(?P<rate>\d+); tunnels? leads? to valves? (?P<tunnels>.+)$").unwrap();
+            static ref RE: Regex = Regex::new(r"^Valve (?P<name>[A-Z]{2}) has flow rate=(?P<rate>\d+); tunnels? leads? to valves? (?P<tunnels>.+)$").expect("Regex did not compile");
         }
         let mut graph = Graph::new();
         let mut start = NodeIndex::new(0);
@@ -77,7 +79,7 @@ impl FromStr for ValveSystem {
 }
 
 impl ValveSystem {
-    pub fn optimize(&self) -> ValveSystem {
+    pub fn optimize(&mut self) {
         let mut new_graph = Graph::new();
         let mut old_to_new: HashMap<NodeIndex, NodeIndex> = HashMap::new();
         let mut new_start = NodeIndex::new(0);
@@ -111,59 +113,72 @@ impl ValveSystem {
                 new_graph.add_edge(*from, *to, *weight);
             });
 
-        ValveSystem {
-            graph: new_graph,
-            start: new_start,
-        }
+        self.graph = new_graph;
+        self.start = new_start;
     }
 
     pub fn max_pressure_impl(
         &self,
         minutes: u32,
         node: NodeIndex,
-        visited: &HashSet<NodeIndex>,
+        visited: HashSet<NodeIndex>,
+        additional_run: Option<u32>,
+        memo: &RefCell<HashMap<(u32, NodeIndex, Vec<NodeIndex>, Option<u32>), u32>>,
     ) -> u32 {
-        /* println!(
-            "max_pressure_imp(minutes: {}, node: {}, visited: {:?})",
-            &minutes,
-            self.graph.node_weight(node).unwrap().name,
-            visited.iter().map(|idx| self.graph.node_weight(*idx).unwrap().name.as_str()).collect_vec()
-        ); */
+        let memo_key = (
+            minutes,
+            node,
+            visited.iter().sorted().map(|x| *x).collect_vec(),
+            additional_run,
+        );
+        if let Some(result) = memo.borrow().get(&memo_key) {
+            return *result
+        }
 
-        // Case 1: no time left
-        if minutes == 0 {
-            return 0;
-        }
-        let running_rate: u32 = visited
-            .iter()
-            .filter_map(|idx| self.graph.node_weight(*idx))
-            .map(|v| v.rate)
-            .sum();
+        let additional = match additional_run {
+            // At any point in the search we should stop if the elephant can get more work done with the current visited set
+            // the elephant would start from the beginning and be allocated the full time
+            Some(minutes) => {
+                self.max_pressure_impl(minutes, self.start, visited.clone(), None, memo)
+            }
+            None => 0,
+        };
 
-        // Case 2: Opening current valve
-        if !visited.contains(&node) {
-            let mut visited = visited.clone();
-            visited.insert(node);
-            return running_rate + self.max_pressure_impl(minutes - 1, node, &visited);
-        }
-        match self
-            .graph
-            .edges(node)
-            .filter(|edge| !visited.contains(&edge.target()) && *edge.weight() < minutes)
-            .map(|edge| {
-                *edge.weight() * running_rate
-                    + self.max_pressure_impl(minutes - edge.weight(), edge.target(), visited)
-            })
-            .max()
-        {
-            // Case 3: Moving in the best direction
-            Some(v) => v,
-            // Case 4: Nowhere left to move. Just keep collecting
-            None => running_rate * minutes,
-        }
+        let result = additional.max(
+            // Return max pressure relief from visiting any adjacent edge
+            self.graph
+                .edges(node)
+                .filter(|edge| !visited.contains(&edge.target()) && *edge.weight() < minutes)
+                .map(|edge| {
+                    // weight_minutes to get to it + 1 minute to open the valve
+                    let minutes_spent = *edge.weight() + 1;
+                    let minutes_remaining = minutes - minutes_spent;
+                    let target_rate = self
+                        .graph
+                        .node_weight(edge.target())
+                        .expect("Node must exist")
+                        .rate;
+                    let mut visited = visited.clone();
+                    visited.insert(edge.target());
+                    target_rate * minutes_remaining
+                        + self.max_pressure_impl(
+                            minutes_remaining,
+                            edge.target(),
+                            visited,
+                            additional_run,
+                            memo,
+                        )
+                })
+                .max()
+                .unwrap_or(0),
+        );
+        memo.borrow_mut().insert(memo_key, result);
+        result
     }
 
-    pub fn max_pressure(&self, minutes: u32) -> u32 {
+    pub fn max_pressure(&self, you_minutes: u32, elephant_minutes: Option<u32>) -> u32 {
+        let memo: RefCell<HashMap<(u32, NodeIndex, Vec<NodeIndex>, Option<u32>), u32>> =
+            RefCell::new(HashMap::new());
         let mut visited = HashSet::new();
         // If start has no rate, don't stop there
         if self
@@ -175,21 +190,22 @@ impl ValveSystem {
         {
             visited.insert(self.start);
         }
-        self.max_pressure_impl(minutes, self.start, &visited)
+        self.max_pressure_impl(you_minutes, self.start, visited, elephant_minutes, &memo)
     }
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let valve_system = input.parse::<ValveSystem>().unwrap();
+    let mut valve_system = input.parse::<ValveSystem>().ok()?;
     //println!("{:?}", petgraph::dot::Dot::new(&valve_system.graph));
-
-    let optimized = valve_system.optimize();
+    valve_system.optimize();
     //println!("{:?}", petgraph::dot::Dot::new(&optimized.graph));
-    Some(optimized.max_pressure(30))
+    Some(valve_system.max_pressure(30, None))
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    None
+    let mut valve_system = input.parse::<ValveSystem>().ok()?;
+    valve_system.optimize();
+    Some(valve_system.max_pressure(26, Some(26)))
 }
 
 fn main() {
