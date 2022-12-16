@@ -17,4 +17,5 @@ petgraph = "0.6.2"
 regex = "1.7.0"
 lazy_static = "1.4.0"
 z3 = {version="0.11.2", features = ["static-link-z3"]}
+memoize = "0.3.3"
 
