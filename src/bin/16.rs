@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use petgraph::algo::floyd_warshall;
 use petgraph::prelude::*;
 use petgraph::Graph;
+use petgraph::IntoWeightedEdge;
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -58,7 +59,7 @@ impl FromStr for ValveSystem {
             }
             let node = graph.add_node(Valve {
                 name: name.to_string(),
-                rate: rate,
+                rate,
             });
             node_map.insert(name, node);
             if name == START_VALVE {
@@ -78,61 +79,58 @@ impl FromStr for ValveSystem {
     }
 }
 
+type MaxPressureInput = (u32, NodeIndex, Vec<NodeIndex>, Option<u32>);
+
 impl ValveSystem {
     pub fn optimize(&mut self) {
-        let mut new_graph = Graph::new();
-        let mut old_to_new: HashMap<NodeIndex, NodeIndex> = HashMap::new();
-        let mut new_start = NodeIndex::new(0);
+        // We must rebuild start_value because indices get invalidated
+        let start_valve = self
+            .graph
+            .node_weight(self.start)
+            .expect("Node must exist")
+            .clone();
+
+        let fw_results =
+            floyd_warshall(&self.graph, |e| *e.weight()).expect("Cannot optimize: Invalid graph");
+
+        // Delete all edges and replace them with shortest-paths fully-connected edges from floyd_warshall
+        self.graph.clear_edges();
+        self.graph.extend_with_edges(
+            fw_results
+                .into_iter()
+                .map(|((s, t), w)| (s, t, w).into_weighted_edge()),
+        );
 
         // Only keep start node and nodes with positive rates
-        self.graph.node_indices().for_each(|old_index| {
-            let valve = self
-                .graph
-                .node_weight(old_index)
-                .expect("Node should exist");
-            if self.start == old_index || valve.rate > 0 {
-                let new_index = new_graph.add_node(valve.clone());
-                old_to_new.insert(old_index, new_index);
-                if old_index == self.start {
-                    new_start = new_index;
-                }
-            }
+        self.graph.retain_nodes(|graph, idx| {
+            let valve = graph.node_weight(idx).expect("Node must exist");
+            *valve == start_valve || valve.rate > 0
         });
 
-        // Only keep best path edges between new nodes
-        floyd_warshall(&self.graph, |_| 1)
-            .expect("Cannot optimize: Invalid graph.")
-            .iter()
-            .filter(|((old_from, old_to), _)| old_from != old_to)
-            .filter_map(|((old_from, old_to), w)| {
-                let new_from = old_to_new.get(old_from)?;
-                let new_to = old_to_new.get(old_to)?;
-                Some(((new_from, new_to), w))
-            })
-            .for_each(|((from, to), weight)| {
-                new_graph.add_edge(*from, *to, *weight);
-            });
-
-        self.graph = new_graph;
-        self.start = new_start;
+        // Rebuilds start value by finding the start node
+        self.start = self
+            .graph
+            .node_indices()
+            .find(|idx| self.graph.node_weight(*idx).expect("Node must exist") == &start_valve)
+            .expect("Start node must exist");
     }
 
-    pub fn max_pressure_impl(
+    fn max_pressure_impl(
         &self,
         minutes: u32,
         node: NodeIndex,
         visited: HashSet<NodeIndex>,
         additional_run: Option<u32>,
-        memo: &RefCell<HashMap<(u32, NodeIndex, Vec<NodeIndex>, Option<u32>), u32>>,
+        memo: &RefCell<HashMap<MaxPressureInput, u32>>,
     ) -> u32 {
         let memo_key = (
             minutes,
             node,
-            visited.iter().sorted().map(|x| *x).collect_vec(),
+            visited.iter().sorted().copied().collect_vec(),
             additional_run,
         );
         if let Some(result) = memo.borrow().get(&memo_key) {
-            return *result
+            return *result;
         }
 
         let additional = match additional_run {
@@ -177,8 +175,7 @@ impl ValveSystem {
     }
 
     pub fn max_pressure(&self, you_minutes: u32, elephant_minutes: Option<u32>) -> u32 {
-        let memo: RefCell<HashMap<(u32, NodeIndex, Vec<NodeIndex>, Option<u32>), u32>> =
-            RefCell::new(HashMap::new());
+        let memo: RefCell<HashMap<MaxPressureInput, u32>> = RefCell::new(HashMap::new());
         let mut visited = HashSet::new();
         // If start has no rate, don't stop there
         if self

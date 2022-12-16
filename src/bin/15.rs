@@ -40,7 +40,9 @@ impl FromStr for SensorReading {
         lazy_static! {
             static ref RE: Regex = Regex::new(r"Sensor at x=(?P<sx>-?\d+), y=(?P<sy>-?\d+): closest beacon is at x=(?P<bx>-?\d+), y=(?P<by>-?\d+)").unwrap();
         }
-        let captures = RE.captures(s).ok_or_else(||anyhow!("Could not match regex"))?;
+        let captures = RE
+            .captures(s)
+            .ok_or_else(|| anyhow!("Could not match regex"))?;
         Ok(SensorReading {
             sensor: Position {
                 x: captures
