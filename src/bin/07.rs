@@ -58,8 +58,8 @@ impl Directory {
             }
             None => self
                 .contents
-                .iter()
-                .map(|(_, c)| match c {
+                .values()
+                .map(|c| match c {
                     Content::Directory(dir) => dir.size(path),
                     Content::File(size) => *size,
                 })
