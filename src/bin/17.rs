@@ -344,7 +344,7 @@ where
     let mut run_iter = std::iter::repeat_with(run)
         .tuple_windows()
         .map(|(h1, h2)| h2 - h1);
-    
+
     // Take away a fixed offsets of heighths and record the sum
     let offset_sum = run_iter.by_ref().take(offset_len).sum::<i64>();
     let deltas = run_iter.take(max_cycle_len).collect_vec();
@@ -352,12 +352,12 @@ where
     // Find the cycle length that satisfies the whole pattern
     let cycle_len = (1..max_cycle_len).find(|size| {
         let window = deltas[..*size].iter().cycle();
-        deltas.iter().clone().zip(window).all(|(a, b)| a == b)
+        deltas.iter().zip(window).all(|(a, b)| a == b)
     })?;
 
     // Sum heights for the cycle length
     let cycle_sum = deltas.iter().take(cycle_len).sum::<i64>();
-    
+
     // Count number of cycles needed to get to n
     let cycle_count = (n - (offset_len as i64)) / (cycle_len as i64);
 
