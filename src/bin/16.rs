@@ -189,16 +189,7 @@ impl ValveSystem {
             additional_run: elephant_minutes,
         };
         let mut memo: HashMap<MaxPressureInput, u32> = HashMap::new();
-        // If start has no rate, don't stop there
-        if self
-            .graph
-            .node_weight(self.start)
-            .expect("Node should exist")
-            .rate
-            == 0
-        {
-            mp_input.visited.insert(self.start);
-        }
+        mp_input.visited.insert(self.start);
         self.max_pressure_impl(mp_input, &mut memo)
     }
 }
