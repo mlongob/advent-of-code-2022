@@ -1,11 +1,11 @@
 use anyhow::anyhow;
+use bit_set::BitSet;
 use lazy_static::lazy_static;
 use petgraph::algo::floyd_warshall;
 use petgraph::prelude::*;
 use petgraph::Graph;
 use petgraph::IntoWeightedEdge;
 use regex::Regex;
-use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::str::FromStr;
@@ -81,7 +81,7 @@ impl FromStr for ValveSystem {
 struct MaxPressureInput {
     minutes: u32,
     node: NodeIndex,
-    visited: BTreeSet<NodeIndex>,
+    visited: BitSet,
     additional_run: Option<u32>,
 }
 
@@ -149,7 +149,7 @@ impl ValveSystem {
             self.graph
                 .edges(input.node)
                 .filter(|edge| {
-                    !input.visited.contains(&edge.target()) && *edge.weight() < input.minutes
+                    !input.visited.contains(edge.target().index()) && *edge.weight() < input.minutes
                 })
                 .map(|edge| {
                     // weight_minutes to get to it + 1 minute to open the valve
@@ -161,7 +161,7 @@ impl ValveSystem {
                         .expect("Node must exist")
                         .rate;
                     let mut visited = input.visited.clone();
-                    visited.insert(edge.target());
+                    visited.insert(edge.target().index());
                     target_rate * minutes_remaining
                         + self.max_pressure_impl(
                             MaxPressureInput {
@@ -185,11 +185,11 @@ impl ValveSystem {
         let mut mp_input = MaxPressureInput {
             minutes: you_minutes,
             node: self.start,
-            visited: BTreeSet::new(),
+            visited: BitSet::new(),
             additional_run: elephant_minutes,
         };
         let mut memo: HashMap<MaxPressureInput, u32> = HashMap::new();
-        mp_input.visited.insert(self.start);
+        mp_input.visited.insert(self.start.index());
         self.max_pressure_impl(mp_input, &mut memo)
     }
 }
