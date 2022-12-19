@@ -1,7 +1,8 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Resource {
     Ore,
     Clay,
@@ -27,9 +28,115 @@ pub struct Blueprint {
     robot_costs: HashMap<Resource, HashMap<Resource, usize>>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GameState {
+    robots: BTreeMap<Resource, usize>,
+    resources: BTreeMap<Resource, usize>,
+}
+
+impl GameState {
+    pub fn new() -> GameState {
+        GameState {
+            robots: BTreeMap::from([(Resource::Ore, 1)]),
+            resources: BTreeMap::new(),
+        }
+    }
+
+    pub fn collect(&mut self) {
+        // Harvest robot resources
+        self.robots.iter().for_each(|(resource, robots)| {
+            self.resources
+                .entry(*resource)
+                .and_modify(|cnt| *cnt += robots)
+                .or_insert(*robots);
+        })
+    }
+
+    pub fn can_afford(&self, costs: &HashMap<Resource, usize>) -> bool {
+        costs
+            .iter()
+            .all(|(res, cost)| self.resources.get(res).unwrap_or(&0) >= cost)
+    }
+
+    pub fn build_robot(&mut self, blueprint: &Blueprint, resource: Resource) -> Option<()> {
+        let robot_costs = blueprint.robot_costs.get(&resource)?;
+        if self.can_afford(robot_costs) {
+            robot_costs.iter().for_each(|(res, cost)| {
+                self.resources.entry(*res).and_modify(|cnt| *cnt -= cost);
+            });
+            self.robots
+                .entry(resource)
+                .and_modify(|cnt| *cnt += 1)
+                .or_insert(1);
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    pub fn affordable_robots<'a>(
+        &'a self,
+        blueprint: &'a Blueprint,
+    ) -> impl Iterator<Item = Resource> + 'a {
+        blueprint
+            .robot_costs
+            .iter()
+            .filter(|(_, costs)| self.can_afford(costs))
+            .map(|(res, _)| *res)
+    }
+
+    pub fn needed_robots<'a>(
+        &'a self,
+        blueprint: &'a Blueprint,
+    ) -> impl Iterator<Item = Resource> + 'a {
+        let max_robots = blueprint.robot_costs
+            .values()
+            .fold(HashMap::new(), |mut acc, v| {
+                v.iter().for_each(|(res, cnt)| {
+                    acc.entry(*res).and_modify(|c: &mut usize| *c = (*c).max(*cnt)).or_insert(*cnt);
+                });
+                acc
+            });
+        max_robots.into_iter().filter(|(resource, max)| {
+            self.resources.get(resource).unwrap_or(&0) < max
+        }).map(|(resource, _)| resource)
+    }
+
+    pub fn geodes(&self) -> usize {
+        *self.resources.get(&Resource::Geode).unwrap_or(&0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct MaxGeodeInput {
+    minutes: usize,
+    state: GameState,
+}
+
 impl Blueprint {
+    fn max_geode_helper(&self, minutes: usize, mut state: GameState) -> usize {
+        println!("max_geode_helper(minutes: {}, state: {:?})", minutes, state);
+        state.collect();
+
+        if minutes == 1 {
+            state.geodes()
+        } else if state.build_robot(self, Resource::Geode).is_some() {
+            self.max_geode_helper(minutes - 1, state)
+        } else {
+            state
+                .affordable_robots(&self)
+                .map(|resource| {
+                    let mut state = state.clone();
+                    state.build_robot(&self, resource);
+                    self.max_geode_helper(minutes - 1, state)
+                })
+                .max()
+                .unwrap_or(self.max_geode_helper(minutes - 1, state))
+        }
+    }
+
     pub fn max_geodes_in_minutes(&self, minutes: usize) -> usize {
-        0
+        self.max_geode_helper(minutes, GameState::new())
     }
 }
 
@@ -40,9 +147,10 @@ pub fn part_one(input: &str) -> Option<usize> {
         .collect::<Vec<_>>();
     let cumulative_score = blueprints
         .iter()
-        .map(|b| b.max_geodes_in_minutes(26))
+        .map(|b| b.max_geodes_in_minutes(24))
         .enumerate()
-        .map(|(n, s)| n * s).sum();
+        .map(|(n, s)| n * s)
+        .sum();
     Some(cumulative_score)
 }
 
