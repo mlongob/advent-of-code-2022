@@ -1,5 +1,6 @@
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::ops::BitAnd;
 use std::str::FromStr;
 
@@ -29,17 +30,17 @@ pub struct Blueprint {
     robot_costs: HashMap<Resource, HashMap<Resource, usize>>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct GameState {
-    robots: HashMap<Resource, usize>,
-    resources: HashMap<Resource, usize>,
+    robots: BTreeMap<Resource, usize>,
+    resources: BTreeMap<Resource, usize>,
 }
 
 impl GameState {
     pub fn new() -> GameState {
         GameState {
-            robots: HashMap::from([(Resource::Ore, 1)]),
-            resources: HashMap::new(),
+            robots: BTreeMap::from([(Resource::Ore, 1)]),
+            resources: BTreeMap::new(),
         }
     }
 
@@ -107,18 +108,25 @@ impl GameState {
             .map(|(resource, _)| resource)
     }
 
-    pub fn robots_to_buy(&self, blueprint: &Blueprint) -> HashSet<Resource> {
-        let affordable_robots: HashSet<_> = self.affordable_robots(blueprint).collect();
+    pub fn robots_to_buy(&self, blueprint: &Blueprint) -> BTreeSet<Resource> {
+        let affordable_robots: BTreeSet<_> = self.affordable_robots(blueprint).collect();
         if affordable_robots.contains(&Resource::Geode) {
-            HashSet::from([Resource::Geode])
+            BTreeSet::from([Resource::Geode])
         } else {
-            let needed_robots: HashSet<_> = self.needed_robots(blueprint).collect();
+            let needed_robots: BTreeSet<_> = self.needed_robots(blueprint).collect();
             affordable_robots.bitand(&needed_robots)
         }
     }
 
     pub fn geodes(&self) -> usize {
         *self.resources.get(&Resource::Geode).unwrap_or(&0)
+    }
+
+    pub fn geodes_upper_limit(&self, minutes: usize) -> usize {
+        let current = self.geodes();
+        let future = self.robots.get(&Resource::Geode).unwrap_or(&0) * minutes;
+        let optimistic = (minutes - 1) * (minutes / 2);
+        current + future + optimistic
     }
 }
 
@@ -127,31 +135,55 @@ impl Blueprint {
         &self,
         minutes: usize,
         mut state: GameState,
-        do_not_buy: HashSet<Resource>,
+        do_not_buy: BTreeSet<Resource>,
+        running_max: &mut usize,
     ) -> usize {
-        if minutes == 1 {
+        // Optimization #1:
+        // If this branch can't possibly get more geodes than the running max, abandon the branch
+        if state.geodes_upper_limit(minutes) < *running_max {
+            return 0;
+        }
+        let val = if minutes == 1 {
+            // Optimization #2:
+            // If there's just 1 minute left, don't bother building
             state.collect();
             state.geodes()
         } else {
+            // Optimization #3:
+            // Only look at candidate robots for resources where there isn't enough robots to mine
+            // the cost of any other robots in 1 turn. (implemented by robots_to_buy)
             let candidates = state.robots_to_buy(self);
+            if candidates.contains(&Resource::Geode) {
+                // Optimization #4:
+                // If you can build a geode robot, just do it. No need to look at other branches
+                state.collect();
+                state.build_robot(self, Resource::Geode);
+                return self.max_geode_helper(minutes - 1, state, BTreeSet::new(), running_max);
+            }
+            // Optimization #5:
+            // If we decide not to build a robot when we have the option, that robot should not be built anywhere
+            // else in that branch until another robot is built (do_not_buy set)
             let buy_a_robot = candidates
                 .difference(&do_not_buy)
                 .map(|resource| {
                     let mut state = state.clone();
                     state.collect();
                     state.build_robot(self, *resource);
-                    self.max_geode_helper(minutes - 1, state, HashSet::new())
+                    self.max_geode_helper(minutes - 1, state, BTreeSet::new(), running_max)
                 })
                 .max()
                 .unwrap_or(0);
             state.collect();
-            let wait_it_out = self.max_geode_helper(minutes - 1, state, candidates);
+            let wait_it_out = self.max_geode_helper(minutes - 1, state, candidates, running_max);
             buy_a_robot.max(wait_it_out)
-        }
+        };
+        *running_max = (*running_max).max(val);
+        val
     }
 
     pub fn max_geodes_in_minutes(&self, minutes: usize) -> usize {
-        self.max_geode_helper(minutes, GameState::new(), HashSet::new())
+        let mut running_max = 0;
+        self.max_geode_helper(minutes, GameState::new(), BTreeSet::new(), &mut running_max)
     }
 }
 
@@ -192,11 +224,21 @@ mod tests {
         assert_eq!(part_one(&input), Some(33));
     }
 
-    #[ignore]
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 19);
         assert_eq!(part_two(&input), Some(3472));
+    }
+
+    #[test]
+    fn part_two_blueprint_1() {
+        let blueprint = advent_of_code::read_file("examples", 19)
+            .lines()
+            .next()
+            .unwrap()
+            .parse::<Blueprint>()
+            .unwrap();
+        assert_eq!(blueprint.max_geodes_in_minutes(32), 56);
     }
 }
 
