@@ -123,9 +123,15 @@ impl GameState {
     }
 
     pub fn geodes_upper_limit(&self, minutes: usize) -> usize {
+        // Geodes we have
         let current = self.geodes();
+
+        // Geodes we will have with existing Robots
         let future = self.robots.get(&Resource::Geode).unwrap_or(&0) * minutes;
+
+        // Geodes we will have if we build geode robots on every remaining turn (optimistic)
         let optimistic = (minutes - 1) * (minutes / 2);
+
         current + future + optimistic
     }
 }
@@ -143,7 +149,7 @@ impl Blueprint {
         if state.geodes_upper_limit(minutes) < *running_max {
             return 0;
         }
-        let val = if minutes == 1 {
+        let max_geodes = if minutes == 1 {
             // Optimization #2:
             // If there's just 1 minute left, don't bother building
             state.collect();
@@ -177,8 +183,8 @@ impl Blueprint {
             let wait_it_out = self.max_geode_helper(minutes - 1, state, candidates, running_max);
             buy_a_robot.max(wait_it_out)
         };
-        *running_max = (*running_max).max(val);
-        val
+        *running_max = (*running_max).max(max_geodes);
+        max_geodes
     }
 
     pub fn max_geodes_in_minutes(&self, minutes: usize) -> usize {
