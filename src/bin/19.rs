@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::BitAnd;
@@ -30,17 +29,17 @@ pub struct Blueprint {
     robot_costs: HashMap<Resource, HashMap<Resource, usize>>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct GameState {
-    robots: BTreeMap<Resource, usize>,
-    resources: BTreeMap<Resource, usize>,
+    robots: HashMap<Resource, usize>,
+    resources: HashMap<Resource, usize>,
 }
 
 impl GameState {
     pub fn new() -> GameState {
         GameState {
-            robots: BTreeMap::from([(Resource::Ore, 1)]),
-            resources: BTreeMap::new(),
+            robots: HashMap::from([(Resource::Ore, 1)]),
+            resources: HashMap::new(),
         }
     }
 
@@ -121,35 +120,30 @@ impl GameState {
     pub fn geodes(&self) -> usize {
         *self.resources.get(&Resource::Geode).unwrap_or(&0)
     }
-
-    pub fn geodes_upper_limit(&self, minutes: usize) -> usize {
-        let current = self.geodes();
-        let future = self.robots.get(&Resource::Geode).unwrap_or(&0) * minutes;
-        let optimistic = (minutes - 1) * (minutes / 2);
-        current + future + optimistic
-    }
 }
 
 impl Blueprint {
-    fn max_geode_helper(&self, minutes: usize, mut state: GameState, do_not_buy: HashSet<Resource>) -> usize {
-        if state.geodes() >= state.geodes_upper_limit(minutes) {
-            return state.geodes();
-        }
-
-        //println!("max_geode_helper(minutes: {}, state: {:?})", minutes, state);
+    fn max_geode_helper(
+        &self,
+        minutes: usize,
+        mut state: GameState,
+        do_not_buy: HashSet<Resource>,
+    ) -> usize {
         if minutes == 1 {
             state.collect();
             state.geodes()
         } else {
-            let candidates = state.robots_to_buy(&self);
-            let buy_a_robot = candidates.difference(&do_not_buy)
+            let candidates = state.robots_to_buy(self);
+            let buy_a_robot = candidates
+                .difference(&do_not_buy)
                 .map(|resource| {
                     let mut state = state.clone();
                     state.collect();
-                    state.build_robot(&self, *resource);
+                    state.build_robot(self, *resource);
                     self.max_geode_helper(minutes - 1, state, HashSet::new())
                 })
-                .max().unwrap_or(0);
+                .max()
+                .unwrap_or(0);
             state.collect();
             let wait_it_out = self.max_geode_helper(minutes - 1, state, candidates);
             buy_a_robot.max(wait_it_out)
@@ -157,9 +151,7 @@ impl Blueprint {
     }
 
     pub fn max_geodes_in_minutes(&self, minutes: usize) -> usize {
-        let res = self.max_geode_helper(minutes, GameState::new(), HashSet::new());
-        dbg!(&res);
-        res
+        self.max_geode_helper(minutes, GameState::new(), HashSet::new())
     }
 }
 
@@ -200,77 +192,7 @@ mod tests {
         assert_eq!(part_one(&input), Some(33));
     }
 
-    #[test]
-    fn test_game_state_bp_2() {
-        let blueprint = advent_of_code::read_file("examples", 19)
-            .lines()
-            .skip(1)
-            .next()
-            .unwrap()
-            .parse::<Blueprint>()
-            .unwrap();
-        let mut state = GameState::new();
-        assert_eq!(state.resources, BTreeMap::new());
-
-        // Minute 1
-        assert_eq!(state.robots_to_buy(&blueprint), HashSet::from([]));
-        state.collect();
-        assert_eq!(state.resources, BTreeMap::from([(Resource::Ore, 1)]));
-
-        // Minute 2
-        assert_eq!(state.robots_to_buy(&blueprint), HashSet::from([]));
-        state.collect();
-        assert_eq!(state.resources, BTreeMap::from([(Resource::Ore, 2)]));
-
-        // Minute 3
-        assert_eq!(
-            state.robots_to_buy(&blueprint),
-            HashSet::from([Resource::Ore])
-        );
-        state.collect();
-        assert_eq!(state.build_robot(&blueprint, Resource::Ore), Some(()));
-        assert_eq!(state.resources, BTreeMap::from([(Resource::Ore, 1),]));
-        assert_eq!(state.robots, BTreeMap::from([(Resource::Ore, 2),]));
-
-        // Minute 4
-        assert_eq!(state.robots_to_buy(&blueprint), HashSet::from([]));
-        state.collect();
-        assert_eq!(state.resources, BTreeMap::from([(Resource::Ore, 3),]));
-        assert_eq!(state.robots, BTreeMap::from([(Resource::Ore, 2),]));
-
-        // Minute 5
-        state.collect();
-        assert_eq!(state.build_robot(&blueprint, Resource::Clay), Some(()));
-        assert_eq!(state.resources, BTreeMap::from([(Resource::Ore, 2),]));
-        assert_eq!(
-            state.robots,
-            BTreeMap::from([(Resource::Ore, 2), (Resource::Clay, 1),])
-        );
-
-        // Minute 6
-        state.collect();
-        assert_eq!(
-            state.resources,
-            BTreeMap::from([(Resource::Ore, 4), (Resource::Clay, 1),])
-        );
-        assert_eq!(
-            state.robots,
-            BTreeMap::from([(Resource::Ore, 2), (Resource::Clay, 1),])
-        );
-
-        // Minute 7
-        state.collect();
-        assert_eq!(state.build_robot(&blueprint, Resource::Clay), Some(()));
-        assert_eq!(
-            state.resources,
-            BTreeMap::from([(Resource::Ore, 3), (Resource::Clay, 2),])
-        );
-        assert_eq!(
-            state.robots,
-            BTreeMap::from([(Resource::Ore, 2), (Resource::Clay, 2),])
-        );
-    }
-
+    #[ignore]
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 19);
