@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EncryptedFile {
-    codes: VecDeque<(usize, i32)>,
+    codes: VecDeque<(usize, i64)>,
 }
 
 impl EncryptedFile {
@@ -13,35 +13,43 @@ impl EncryptedFile {
         }
     }
 
-    pub fn mix(&mut self) {
-        // Iterate through all message ids
-        (0..self.codes.len()).for_each(|id| {
-            // Find the message id O(N), extract current position in the deque
-            let pos = self
-                .codes
-                .iter()
-                .enumerate()
-                .find_map(|(pos, (n_id, _))| (*n_id == id).then_some(pos))
-                .expect("All message ids must be present");
+    pub fn apply_key(&mut self, key: i64) {
+        self.codes.iter_mut().for_each(|v| v.1 *= key);
 
-            // Rotate the deque such that the message is at the front
-            self.codes.rotate_left(pos);
+    }
 
-            // Pop out the message
-            let message = self.codes.pop_front().expect("Collection cannot be empty");
+    pub fn mix(&mut self, iterations: usize) {
+        // For every iteration
+        (0..iterations).for_each(|_| {
+            // Iterate through all message ids
+            (0..self.codes.len()).for_each(|id| {
+                // Find the message id O(N), extract current position in the deque
+                let pos = self
+                    .codes
+                    .iter()
+                    .enumerate()
+                    .find_map(|(pos, (n_id, _))| (*n_id == id).then_some(pos))
+                    .expect("All message ids must be present");
 
-            // Compute new position accounting for circular buffer
-            let rotation = message.1.rem_euclid(self.codes.len() as i32) as usize;
+                // Rotate the deque such that the message is at the front
+                self.codes.rotate_left(pos);
 
-            // Rotate to new position
-            self.codes.rotate_left(rotation);
+                // Pop out the message
+                let message = self.codes.pop_front().expect("Collection cannot be empty");
 
-            // Re-insert the message
-            self.codes.push_front(message);
+                // Compute new position accounting for circular buffer
+                let rotation = message.1.rem_euclid(self.codes.len() as i64) as usize;
+
+                // Rotate to new position
+                self.codes.rotate_left(rotation);
+
+                // Re-insert the message
+                self.codes.push_front(message);
+            });
         });
     }
 
-    pub fn coordinate(&self) -> Option<i32> {
+    pub fn coordinate(&self) -> Option<i64> {
         // Find the zero
         let zero_position = self
             .codes
@@ -65,21 +73,26 @@ impl FromStr for EncryptedFile {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let codes = s
             .lines()
-            .filter_map(|l| l.parse::<i32>().ok())
+            .filter_map(|l| l.parse::<i64>().ok())
             .enumerate()
             .collect::<VecDeque<_>>();
         Ok(EncryptedFile { codes })
     }
 }
 
-pub fn part_one(input: &str) -> Option<i32> {
+pub fn part_one(input: &str) -> Option<i64> {
     let mut file = input.parse::<EncryptedFile>().ok()?;
-    file.mix();
+    file.mix(1);
     file.coordinate()
 }
 
-pub fn part_two(input: &str) -> Option<i32> {
-    None
+pub fn part_two(input: &str) -> Option<i64> {
+    const DECRYPTION_KEY: i64 = 811_589_153;
+    const ITERATIONS: usize = 10;
+    let mut file = input.parse::<EncryptedFile>().ok()?;
+    file.apply_key(DECRYPTION_KEY);
+    file.mix(ITERATIONS);
+    file.coordinate()
 }
 
 fn main() {
@@ -101,6 +114,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 20);
-        assert_eq!(part_two(&input), None);
+        assert_eq!(part_two(&input), Some(1623178306));
     }
 }
