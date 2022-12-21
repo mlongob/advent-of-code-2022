@@ -15,7 +15,6 @@ impl EncryptedFile {
 
     pub fn apply_key(&mut self, key: i64) {
         self.codes.iter_mut().for_each(|v| v.1 *= key);
-
     }
 
     pub fn mix(&mut self, iterations: usize) {
