@@ -64,7 +64,7 @@ impl ValleyGraph {
         &self,
         start: NodeIndex,
         goal: &Position,
-    ) -> Option<(usize, Vec<NodeIndex>)> {
+    ) -> Option<Vec<NodeIndex>> {
         astar(
             &self.graph,
             start,
@@ -74,16 +74,16 @@ impl ValleyGraph {
             },
             |e| *e.weight(),
             |_| 0,
-        )
+        ).map(|t|t.1)
     }
 
-    fn three_leg_path(&self) -> Option<Vec<Position>> {
+    pub fn three_leg_path(&self) -> Option<Vec<Position>> {
         let start_position = self.graph.node_weight(self.start)?.1.clone();
-        let first_leg = self.shortest_path_impl(self.start, &self.end_position)?.1;
+        let first_leg = self.shortest_path_impl(self.start, &self.end_position)?;
         let pivot_1 = *first_leg.last()?;
-        let second_leg = self.shortest_path_impl(pivot_1, &start_position)?.1;
+        let second_leg = self.shortest_path_impl(pivot_1, &start_position)?;
         let pivot_2 = *second_leg.last()?;
-        let third_leg = self.shortest_path_impl(pivot_2, &self.end_position)?.1;
+        let third_leg = self.shortest_path_impl(pivot_2, &self.end_position)?;
         Some(
             first_leg
                 .into_iter()
@@ -97,7 +97,7 @@ impl ValleyGraph {
 
     pub fn single_leg_path(&self) -> Option<Vec<Position>> {
         self.shortest_path_impl(self.start, &self.end_position)
-            .map(|(_, v)| {
+            .map(|v| {
                 v.into_iter()
                     .filter_map(|idx| self.graph.node_weight(idx))
                     .map(|(_, p)| p.clone())
