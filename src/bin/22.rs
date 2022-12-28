@@ -358,14 +358,20 @@ impl Board {
                     },
                     Direction::Up,
                 ),
-                Position { y: 100..=149, x: 99 } => (
+                Position {
+                    y: 100..=149,
+                    x: 99,
+                } => (
                     Position {
                         y: 149 - position.y,
                         x: 149,
                     },
                     Direction::Left,
                 ),
-                Position { y: 150..=199, x: 49 } => (
+                Position {
+                    y: 150..=199,
+                    x: 49,
+                } => (
                     Position {
                         y: 149,
                         x: position.y - 100,
@@ -381,7 +387,10 @@ impl Board {
                 ),
             },
             Direction::Down => match position {
-                Position { y: 49, x: 100..=149 } => (
+                Position {
+                    y: 49,
+                    x: 100..=149,
+                } => (
                     Position {
                         y: position.x - 50,
                         x: 99,

@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt::Display;
+use std::iter;
 use std::ops::RangeInclusive;
 use std::str::FromStr;
-use std::iter;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
@@ -47,38 +47,38 @@ impl Position {
 
     pub fn neighbors(&self) -> impl Iterator<Item = Position> {
         [
-                Position {
-                    y: self.y - 1,
-                    x: self.x - 1,
-                },
-                Position {
-                    y: self.y - 1,
-                    x: self.x,
-                },
-                Position {
-                    y: self.y - 1,
-                    x: self.x + 1,
-                },
-                Position {
-                    y: self.y + 1,
-                    x: self.x - 1,
-                },
-                Position {
-                    y: self.y + 1,
-                    x: self.x,
-                },
-                Position {
-                    y: self.y + 1,
-                    x: self.x + 1,
-                },
-                Position {
-                    y: self.y,
-                    x: self.x - 1,
-                },
-                Position {
-                    y: self.y,
-                    x: self.x + 1,
-                },
+            Position {
+                y: self.y - 1,
+                x: self.x - 1,
+            },
+            Position {
+                y: self.y - 1,
+                x: self.x,
+            },
+            Position {
+                y: self.y - 1,
+                x: self.x + 1,
+            },
+            Position {
+                y: self.y + 1,
+                x: self.x - 1,
+            },
+            Position {
+                y: self.y + 1,
+                x: self.x,
+            },
+            Position {
+                y: self.y + 1,
+                x: self.x + 1,
+            },
+            Position {
+                y: self.y,
+                x: self.x - 1,
+            },
+            Position {
+                y: self.y,
+                x: self.x + 1,
+            },
         ]
         .into_iter()
     }
@@ -216,10 +216,10 @@ impl Grid {
         let mut proposed_moves: BTreeMap<Position, Vec<Position>> = BTreeMap::new();
         self.elves.iter().for_each(|elf| {
             if elf.neighbors().any(|n| self.elves.contains(&n)) {
-                match self
-                    .directions()
-                    .find(|d| elf.directional_neighbors(d).all(|p| !self.elves.contains(&p)))
-                {
+                match self.directions().find(|d| {
+                    elf.directional_neighbors(d)
+                        .all(|p| !self.elves.contains(&p))
+                }) {
                     None => {
                         new_grid.insert(elf.clone());
                     }

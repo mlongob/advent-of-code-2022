@@ -60,11 +60,7 @@ pub struct ValleyGraph {
 }
 
 impl ValleyGraph {
-    fn shortest_path_impl(
-        &self,
-        start: NodeIndex,
-        goal: &Position,
-    ) -> Option<Vec<NodeIndex>> {
+    fn shortest_path_impl(&self, start: NodeIndex, goal: &Position) -> Option<Vec<NodeIndex>> {
         astar(
             &self.graph,
             start,
@@ -74,7 +70,8 @@ impl ValleyGraph {
             },
             |e| *e.weight(),
             |_| 0,
-        ).map(|t|t.1)
+        )
+        .map(|t| t.1)
     }
 
     pub fn three_leg_path(&self) -> Option<Vec<Position>> {

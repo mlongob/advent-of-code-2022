@@ -1,13 +1,13 @@
 use std::collections::VecDeque;
-use std::fmt::Display;
 use std::fmt;
-use std::str::FromStr;
+use std::fmt::Display;
+use std::iter::Sum;
 use std::ops::Add;
 use std::ops::AddAssign;
-use std::iter::Sum;
+use std::str::FromStr;
 
-use itertools::Itertools;
 use itertools::EitherOrBoth::{Both, Left, Right};
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SnafuDigit {
@@ -15,7 +15,7 @@ pub enum SnafuDigit {
     Minus,
     Zero,
     One,
-    Two
+    Two,
 }
 
 impl TryFrom<char> for SnafuDigit {
@@ -52,7 +52,9 @@ impl Add for SnafuDigit {
             (Self::Zero, d) | (d, Self::Zero) => (Self::Zero, d),
 
             // 1 + = >> (0, -)
-            (Self::One, Self::DoubleMinus) | (Self::DoubleMinus, Self::One) => (Self::Zero, Self::Minus),
+            (Self::One, Self::DoubleMinus) | (Self::DoubleMinus, Self::One) => {
+                (Self::Zero, Self::Minus)
+            }
 
             // 1 + - >> (0, 0)
             (Self::One, Self::Minus) | (Self::Minus, Self::One) => (Self::Zero, Self::Zero),
@@ -64,7 +66,9 @@ impl Add for SnafuDigit {
             (Self::One, Self::Two) | (Self::Two, Self::One) => (Self::One, Self::DoubleMinus),
 
             // 2 + = >> (0, 0)
-            (Self::Two, Self::DoubleMinus) | (Self::DoubleMinus, Self::Two) => (Self::Zero, Self::Zero),
+            (Self::Two, Self::DoubleMinus) | (Self::DoubleMinus, Self::Two) => {
+                (Self::Zero, Self::Zero)
+            }
 
             // 2 + - >> (0, 1)
             (Self::Two, Self::Minus) | (Self::Minus, Self::Two) => (Self::Zero, Self::One),
@@ -76,7 +80,9 @@ impl Add for SnafuDigit {
             (Self::Minus, Self::Minus) => (Self::Zero, Self::DoubleMinus),
 
             // - + = >> (-, 2)
-            (Self::Minus, Self::DoubleMinus) | (Self::DoubleMinus, Self::Minus) => (Self::Minus, Self::Two),
+            (Self::Minus, Self::DoubleMinus) | (Self::DoubleMinus, Self::Minus) => {
+                (Self::Minus, Self::Two)
+            }
 
             // = + = >> (-, 1)
             (Self::DoubleMinus, Self::DoubleMinus) => (Self::Minus, Self::One),
@@ -86,16 +92,20 @@ impl Add for SnafuDigit {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Snafu {
-    digits: VecDeque<SnafuDigit>
+    digits: VecDeque<SnafuDigit>,
 }
 
 impl Snafu {
     pub fn zero() -> Snafu {
-        Snafu { digits: VecDeque::from([SnafuDigit::Zero]) }
+        Snafu {
+            digits: VecDeque::from([SnafuDigit::Zero]),
+        }
     }
 
     pub fn one() -> Snafu {
-        Snafu { digits: VecDeque::from([SnafuDigit::One]) }
+        Snafu {
+            digits: VecDeque::from([SnafuDigit::One]),
+        }
     }
 
     pub fn new() -> Snafu {
@@ -121,7 +131,10 @@ impl Display for Snafu {
 impl FromStr for Snafu {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let digits = s.chars().flat_map(|c|SnafuDigit::try_from(c).ok()).collect::<VecDeque<_>>();
+        let digits = s
+            .chars()
+            .flat_map(|c| SnafuDigit::try_from(c).ok())
+            .collect::<VecDeque<_>>();
         Ok(Snafu { digits })
     }
 }
@@ -129,18 +142,32 @@ impl FromStr for Snafu {
 impl Add for Snafu {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        let (mut acc, carry) = self.digits.into_iter().rev().zip_longest(rhs.digits.into_iter().rev()).map(|x| match x {
-            Both(a, b) => (a, b),
-            Left(a) => (a, SnafuDigit::Zero),
-            Right(b) => (SnafuDigit::Zero, b),
-        }).fold((Snafu{digits: VecDeque::new()}, SnafuDigit::Zero), |(mut acc, carry), (lhs_digit, rhs_digit)| {
-            let (c1, r1) = lhs_digit + carry;
-            let (c2, result) = rhs_digit + r1;
-            // Two carry's do not add up to more carry's
-            let (_, carry) = c1 + c2;
-            acc.digits.push_front(result);
-            (acc, carry)
-        });
+        let (mut acc, carry) = self
+            .digits
+            .into_iter()
+            .rev()
+            .zip_longest(rhs.digits.into_iter().rev())
+            .map(|x| match x {
+                Both(a, b) => (a, b),
+                Left(a) => (a, SnafuDigit::Zero),
+                Right(b) => (SnafuDigit::Zero, b),
+            })
+            .fold(
+                (
+                    Snafu {
+                        digits: VecDeque::new(),
+                    },
+                    SnafuDigit::Zero,
+                ),
+                |(mut acc, carry), (lhs_digit, rhs_digit)| {
+                    let (c1, r1) = lhs_digit + carry;
+                    let (c2, result) = rhs_digit + r1;
+                    // Two carry's do not add up to more carry's
+                    let (_, carry) = c1 + c2;
+                    acc.digits.push_front(result);
+                    (acc, carry)
+                },
+            );
         if carry != SnafuDigit::Zero {
             acc.digits.push_front(carry);
         }
