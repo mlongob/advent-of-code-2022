@@ -177,7 +177,7 @@ impl Add for Snafu {
 
 impl AddAssign for Snafu {
     fn add_assign(&mut self, rhs: Self) {
-        *self = self.clone() + rhs
+        *self = std::mem::take(self) + rhs
     }
 }
 
