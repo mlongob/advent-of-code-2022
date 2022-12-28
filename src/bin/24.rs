@@ -60,30 +60,49 @@ pub struct ValleyGraph {
 }
 
 impl ValleyGraph {
-    fn is_goal(&self, idx: NodeIndex) -> bool {
-        match self.graph.node_weight(idx) {
-            None => false,
-            Some((_, pos)) => *pos == self.end_position,
-        }
-    }
-
-    fn shortest_path_impl(&self) -> Option<(usize, Vec<NodeIndex>)> {
+    fn shortest_path_impl(
+        &self,
+        start: NodeIndex,
+        goal: &Position,
+    ) -> Option<(usize, Vec<NodeIndex>)> {
         astar(
             &self.graph,
-            self.start,
-            |idx| self.is_goal(idx),
+            start,
+            |idx| match self.graph.node_weight(idx) {
+                None => false,
+                Some((_, pos)) => pos == goal,
+            },
             |e| *e.weight(),
             |_| 0,
         )
     }
 
-    pub fn shortest_path(&self) -> Option<Vec<Position>> {
-        self.shortest_path_impl().map(|(_, v)| {
-            v.into_iter()
+    fn three_leg_path(&self) -> Option<Vec<Position>> {
+        let start_position = self.graph.node_weight(self.start)?.1.clone();
+        let first_leg = self.shortest_path_impl(self.start, &self.end_position)?.1;
+        let pivot_1 = *first_leg.last()?;
+        let second_leg = self.shortest_path_impl(pivot_1, &start_position)?.1;
+        let pivot_2 = *second_leg.last()?;
+        let third_leg = self.shortest_path_impl(pivot_2, &self.end_position)?.1;
+        Some(
+            first_leg
+                .into_iter()
+                .chain(second_leg.into_iter().skip(1))
+                .chain(third_leg.into_iter().skip(1))
                 .filter_map(|idx| self.graph.node_weight(idx))
                 .map(|(_, p)| p.clone())
-                .collect::<Vec<_>>()
-        })
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    pub fn single_leg_path(&self) -> Option<Vec<Position>> {
+        self.shortest_path_impl(self.start, &self.end_position)
+            .map(|(_, v)| {
+                v.into_iter()
+                    .filter_map(|idx| self.graph.node_weight(idx))
+                    .map(|(_, p)| p.clone())
+                    .collect::<Vec<_>>()
+            })
     }
 }
 
@@ -306,12 +325,15 @@ impl FromStr for Valley {
 pub fn part_one(input: &str) -> Option<usize> {
     let valley = input.parse::<Valley>().ok()?;
     let valley_graph = valley.graph();
-    let path = valley_graph.shortest_path()?;
+    let path = valley_graph.single_leg_path()?;
     Some(path.len() - 1)
 }
 
-pub fn part_two(input: &str) -> Option<u32> {
-    None
+pub fn part_two(input: &str) -> Option<usize> {
+    let valley = input.parse::<Valley>().ok()?;
+    let valley_graph = valley.graph();
+    let path = valley_graph.three_leg_path()?;
+    Some(path.len() - 1)
 }
 
 fn main() {
@@ -333,6 +355,6 @@ mod tests {
     #[test]
     fn test_part_two() {
         let input = advent_of_code::read_file("examples", 24);
-        assert_eq!(part_two(&input), None);
+        assert_eq!(part_two(&input), Some(54));
     }
 }
