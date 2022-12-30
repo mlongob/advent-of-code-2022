@@ -38,81 +38,46 @@ impl MonkeyMath {
         Some(result)
     }
 
+    fn eval_z3<'a>(&self, monkey: &String, ctx: &'a z3::Context, humn: &'a z3::ast::Int) -> Option<z3::ast::Int<'a>> {
+        if monkey == "humn" {
+            return Some(humn.clone())
+        }
+        use z3::*;
+        let expr = self.expressions.get(monkey)?;
+        let result = match expr {
+            Expression::Num(n) => ast::Int::from_u64(&ctx, *n),
+            Expression::Sum(a, b) => {
+                self.eval_z3(a, ctx, humn)? + self.eval_z3(b, ctx, humn)?
+            }                
+            Expression::Sub(a, b) => {
+                self.eval_z3(a, ctx, humn)? - self.eval_z3(b, ctx, humn)?
+            }
+            Expression::Mul(a, b) => {
+                self.eval_z3(a, ctx, humn)? * self.eval_z3(b, ctx, humn)?
+            }
+            Expression::Div(a, b) => {
+                self.eval_z3(a, ctx, humn)? / self.eval_z3(b, ctx, humn)?
+            }
+        };
+        Some(result)
+    }
+
     pub fn find_human_value(&self) -> Option<u64> {
         use z3::*;
         let ctx = Context::new(&Config::new());
-        let consts = self
-            .expressions
-            .keys()
-            .filter(|a| a.as_str() != "root")
-            .fold(HashMap::new(), |mut acc, m| {
-                acc.insert(m.clone(), ast::Int::new_const(&ctx, m.as_str()));
-                acc
-            });
+        let humn = ast::Int::new_const(&ctx, "humn");
         let solver = Solver::new(&ctx);
-        for (monkey, expr) in self.expressions.iter() {
-            match monkey.as_str() {
-                "root" => {
-                    let (a, b) = if let Expression::Sum(a, b) = expr {
-                        Some((a, b))
-                    } else {
-                        None
-                    }?;
-                    let a = consts.get(a)?;
-                    let b = consts.get(b)?;
-                    solver.assert(&a._eq(b));
-                    //constraint: a == b
-                }
-                "humn" => {
-                    // Do nothing
-                }
-                _ => {
-                    let monkey = consts.get(monkey)?;
-                    match expr {
-                        Expression::Num(n) => {
-                            //constraint: monkey = n
-                            let n = ast::Int::from_u64(&ctx, *n);
-                            solver.assert(&monkey._eq(&n));
-                        }
-                        Expression::Sum(a, b) => {
-                            let a = consts.get(a)?;
-                            let b = consts.get(b)?;
-
-                            //constraint: monkey = a + b
-                            solver.assert(&monkey._eq(&(a + b)));
-                        }
-                        Expression::Sub(a, b) => {
-                            let a = consts.get(a)?;
-                            let b = consts.get(b)?;
-
-                            //constraint: monkey = a - b
-                            solver.assert(&monkey._eq(&(a - b)));
-                        }
-                        Expression::Mul(a, b) => {
-                            let a = consts.get(a)?;
-                            let b = consts.get(b)?;
-
-                            //constraint: monkey = a * b
-                            solver.assert(&monkey._eq(&(a * b)));
-                        }
-                        Expression::Div(a, b) => {
-                            let a = consts.get(a)?;
-                            let b = consts.get(b)?;
-
-                            //constraint: monkey = a / b
-                            solver.assert(&monkey._eq(&(a / b)));
-
-                            //need to add additinoal constraint of: a % b = 0 for integer division
-                            solver.assert(&(a % b)._eq(&ast::Int::from_u64(&ctx, 0)));
-                        }
-                    }
-                }
-            };
-        }
+        let (a, b) = if let Expression::Sum(a, b) = self.expressions.get(&"root".to_string())? {
+            Some((a, b))
+        } else {
+            None
+        }?;
+        let a = self.eval_z3(a, &ctx, &humn)?;
+        let b = self.eval_z3(b, &ctx, &humn)?;
+        solver.assert(&a._eq(&b));
         if solver.check() == SatResult::Sat {
-            let goal = consts.get(&"humn".to_string())?;
             let model = solver.get_model()?;
-            let goal = model.eval(goal, true)?.as_u64()?;
+            let goal = model.eval(&humn, true)?.as_u64()?;
             Some(goal)
         } else {
             None
